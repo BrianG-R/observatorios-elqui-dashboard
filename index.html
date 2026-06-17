@@ -36,7 +36,17 @@
   <main class="dashboard">
 
     <!-- SECCIÓN 1: KPIs EJECUTIVOS -->
-    <section class="section">
+    
+<section class="section">
+<h2 class="section-title">Estado ETL y Almacenamiento</h2>
+<div class="kpi-grid">
+<div class="kpi-card"><span class="kpi-label">Fuente</span><span class="kpi-value">NASA + OpenMeteo</span></div>
+<div class="kpi-card"><span class="kpi-label">ETL</span><span class="kpi-value">Python/Pandas</span></div>
+<div class="kpi-card"><span class="kpi-label">Base de Datos</span><span class="kpi-value">MongoDB</span></div>
+<div class="kpi-card"><span class="kpi-label">Snapshots</span><span class="kpi-value" id="snapshotCount">0</span></div>
+</div>
+</section>
+<section class="section">
       <h2 class="section-title">Resumen ejecutivo</h2>
       <div class="kpi-grid">
         <div class="kpi-card">
@@ -266,6 +276,7 @@
 </div>
 <div id="alertPanel" class="insights-panel"></div>
 </section>
+
 </main>
 
   <footer class="site-footer">

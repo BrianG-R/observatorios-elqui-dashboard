@@ -375,3 +375,10 @@ function updateDashboardStatus(){
 document.addEventListener('DOMContentLoaded',()=>{
   setTimeout(updateDashboardStatus,1500);
 });
+
+function updateSnapshotCounter(){
+ const c=JSON.parse(localStorage.getItem('etl_snapshots')||'[]').length;
+ const el=document.getElementById('snapshotCount');
+ if(el) el.textContent=c;
+}
+document.addEventListener('DOMContentLoaded',updateSnapshotCounter);

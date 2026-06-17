@@ -249,3 +249,8 @@ data/snapshot.json
 DEV_MODE: false
 
 Permite consumir NASA + Open-Meteo y actualizar el snapshot.
+
+
+## Nueva Arquitectura
+Frontend -> Flask API -> MongoDB Atlas
+ETL Python + Pandas para NASA y Open-Meteo.
