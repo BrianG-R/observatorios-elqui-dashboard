@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NASA NeoWs — Dashboard Big Data & BI</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="config.js"></script>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <span class="brand-icon">☄</span>
+        <div>
+          <h1>NASA NeoWs Analytics</h1>
+          <p class="brand-subtitle">Near Earth Object — Dashboard Big Data & Business Intelligence</p>
+        </div>
+      </div>
+      <div class="header-controls">
+        <label for="dateStart">Desde</label>
+        <input type="date" id="dateStart" />
+        <label for="dateEnd">Hasta</label>
+        <input type="date" id="dateEnd" />
+        <button id="btnLoad" onclick="loadData()">Cargar datos ↗</button><button id="btnRefresh" onclick="refreshData()">Actualizar NASA</button>
+      </div>
+    </div>
+    <div id="statusBar" class="status-bar hidden">
+      <span id="statusMsg">Cargando datos desde NASA API...</span>
+    </div>
+  </header>
+
+  <main class="dashboard">
+
+    <!-- SECCIÓN 1: KPIs EJECUTIVOS -->
+    
+<section class="section">
+<h2 class="section-title">Estado ETL y Almacenamiento</h2>
+<div class="kpi-card">
+  <span class="kpi-label">Snapshots ETL</span>
+  <span class="kpi-value" id="snapshotCount">0</span>
+</div>
+
+<div class="kpi-card">
+  <span class="kpi-label">Documentos MongoDB</span>
+  <span class="kpi-value" id="mongoDocs">0</span>
+</div>
+
+<div class="kpi-card">
+  <span class="kpi-label">Colecciones Activas</span>
+  <span class="kpi-value" id="mongoCollections">0</span>
+</div>
+
+<div class="kpi-card">
+  <span class="kpi-label">Última Sincronización</span>
+  <span class="kpi-value" id="mongoLastSync">--</span>
+</div>
+</section>
+<section class="section">
+      <h2 class="section-title">Resumen ejecutivo</h2>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">Total asteroides</span>
+          <span class="kpi-value" id="kpiTotal">—</span>
+        </div>
+        <div class="kpi-card kpi-danger">
+          <span class="kpi-label">Potencialmente peligrosos</span>
+          <span class="kpi-value" id="kpiPeligrosos">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">% Peligrosos</span>
+          <span class="kpi-value" id="kpiPct">—</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Velocidad promedio</span>
+          <span class="kpi-value" id="kpiVelProm">—</span>
+          <span class="kpi-unit">km/h</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Velocidad máxima</span>
+          <span class="kpi-value" id="kpiVelMax">—</span>
+          <span class="kpi-unit">km/h</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Distancia promedio</span>
+          <span class="kpi-value" id="kpiDistProm">—</span>
+          <span class="kpi-unit">km</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Distancia mínima</span>
+          <span class="kpi-value" id="kpiDistMin">—</span>
+          <span class="kpi-unit">km</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Diámetro promedio</span>
+          <span class="kpi-value" id="kpiDiamProm">—</span>
+          <span class="kpi-unit">km</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 2: ANÁLISIS TEMPORAL -->
+    <section class="section">
+      <h2 class="section-title">Análisis temporal</h2>
+      <div class="chart-grid-2">
+        <div class="chart-card">
+          <h3 class="chart-title">Asteroides por día</h3>
+          <div class="chart-wrap" style="height:260px">
+            <canvas id="chartPorDia" role="img" aria-label="Línea temporal de asteroides detectados por día">Sin datos cargados.</canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-title">Distribución horaria de velocidades</h3>
+          <div class="chart-wrap" style="height:260px">
+            <canvas id="chartVelDistrib" role="img" aria-label="Distribución de velocidades de asteroides">Sin datos cargados.</canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 3: ANÁLISIS DE RIESGO -->
+    <section class="section">
+      <h2 class="section-title">Análisis de riesgo</h2>
+      <div class="chart-grid-3">
+        <div class="chart-card">
+          <h3 class="chart-title">Peligrosos vs. no peligrosos</h3>
+          <div class="chart-legend" id="legendPeligro"></div>
+          <div class="chart-wrap" style="height:220px">
+            <canvas id="chartPeligro" role="img" aria-label="Doughnut de asteroides peligrosos vs no peligrosos">Sin datos cargados.</canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-title">Velocidad por categoría de riesgo</h3>
+          <div class="chart-wrap" style="height:220px">
+            <canvas id="chartVelRiesgo" role="img" aria-label="Barras de velocidad promedio por nivel de riesgo">Sin datos cargados.</canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-title">Radar de métricas clave</h3>
+          <div class="chart-wrap" style="height:220px">
+            <canvas id="chartRadar" role="img" aria-label="Radar de métricas de asteroides peligrosos vs no peligrosos">Sin datos cargados.</canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 4: ANÁLISIS FÍSICO -->
+    <section class="section">
+      <h2 class="section-title">Análisis físico</h2>
+      <div class="chart-grid-2">
+        <div class="chart-card">
+          <h3 class="chart-title">Distribución de diámetros</h3>
+          <div class="chart-wrap" style="height:260px">
+            <canvas id="chartDiam" role="img" aria-label="Histograma de distribución de diámetros de asteroides">Sin datos cargados.</canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-title">Velocidad vs. distancia (dispersión)</h3>
+          <div class="chart-wrap" style="height:260px">
+            <canvas id="chartScatter" role="img" aria-label="Scatter plot de velocidad versus distancia de aproximación">Sin datos cargados.</canvas>
+          </div>
+        </div>
+      </div>
+      <div class="chart-grid-2" style="margin-top:16px">
+        <div class="chart-card">
+          <h3 class="chart-title">Top 10 asteroides más rápidos</h3>
+          <div class="chart-wrap" style="height:320px">
+            <canvas id="chartTop10Vel" role="img" aria-label="Barras horizontales de los 10 asteroides más rápidos">Sin datos cargados.</canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-title">Top 10 asteroides más grandes</h3>
+          <div class="chart-wrap" style="height:320px">
+            <canvas id="chartTop10Diam" role="img" aria-label="Barras horizontales de los 10 asteroides con mayor diámetro">Sin datos cargados.</canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 5: INSIGHTS AUTOMÁTICOS -->
+    <section class="section">
+      <h2 class="section-title">Insights automáticos</h2>
+      <div id="insightsContainer" class="insights-grid">
+        <div class="insight-placeholder">
+          <span>☄</span>
+          <p>Carga datos para generar hallazgos automáticos sobre los asteroides detectados.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABLA DE DATOS -->
+    <section class="section">
+      <h2 class="section-title">Tabla de datos — modelo analítico</h2>
+      <div class="table-controls">
+        <input type="text" id="searchInput" placeholder="Buscar asteroide..." oninput="filterTable()" />
+        <select id="filterPeligro" onchange="filterTable()">
+          <option value="all">Todos</option>
+          <option value="true">Solo peligrosos</option>
+          <option value="false">No peligrosos</option>
+        </select>
+        <span id="tableCount" class="table-count"></span>
+      </div>
+      
+<section id="statusPanel" class="status-panel">
+  <div class="status-card">
+    <div class="status-label">Última sincronización</div>
+    <div id="lastSyncValue" class="status-value">--</div>
+  </div>
+
+  <div class="status-card">
+    <div class="status-label">Fuente de datos</div>
+    <div class="status-value">NASA NeoWs + Open‑Meteo</div>
+  </div>
+
+  
+<div class="status-card">
+  <div class="status-label">Ubicación de observación</div>
+  <div class="status-value">
+    La Serena / Cerro Tololo<br>
+    Lat: -30.169 &nbsp; Lon: -70.804
+  </div>
+</div>
+
+<div class="status-card alert-card">
+    <div class="status-label">Alertas Activas</div>
+    <div id="alertList" class="status-value">Sin alertas</div>
+  </div>
+</section>
+<section id="weatherKPIs" style="margin:20px;padding:12px;border:1px solid #333;border-radius:8px">
+      <h3>Condiciones de Observación</h3>
+<div id="weatherSummary" class="weather-grid">
+  <div class="weather-card">
+    <div class="weather-label">Temperatura</div>
+    <div class="weather-value"><span id="tempValue">--</span> °C</div>
+  </div>
+
+  <div class="weather-card">
+    <div class="weather-label">Nubosidad</div>
+    <div class="weather-value"><span id="cloudValue">--</span>%</div>
+  </div>
+
+  <div class="weather-card">
+    <div class="weather-label">Viento</div>
+    <div class="weather-value"><span id="windValue">--</span> km/h</div>
+  </div>
+
+  <div class="weather-card">
+    <div class="weather-label">Índice Observación</div>
+    <div class="weather-value"><span id="obsValue">--</span></div>
+  </div>
+</div>
+      <div id="alertPanel"></div>
+    </section>
+<div class="table-wrap">
+        <table id="dataTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Fecha</th>
+              <th>Vel. (km/h)</th>
+              <th>Dist. (km)</th>
+              <th>Diám. mín (km)</th>
+              <th>Diám. máx (km)</th>
+              <th>¿Peligroso?</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="8" class="empty-row">Carga datos para ver el modelo analítico.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section class="section">
+  <h2 class="section-title">
+    Análisis Climático Histórico
+  </h2>
+
+  <div class="chart-grid-3">
+
+    <div class="chart-card">
+      <h3 class="chart-title">
+        Temperatura Histórica
+      </h3>
+
+      <div class="chart-wrap" style="height:260px">
+        <canvas id="chartTemp"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3 class="chart-title">
+        Nubosidad Histórica
+      </h3>
+
+      <div class="chart-wrap" style="height:260px">
+        <canvas id="chartCloud"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3 class="chart-title">
+        Viento Histórico
+      </h3>
+
+      <div class="chart-wrap" style="height:260px">
+        <canvas id="chartWind"></canvas>
+      </div>
+    </div>
+
+  </div>
+</section>
+  
+    
+    
+
+<section class="section">
+<h2 class="section-title">Condiciones de Observación y Alertas</h2>
+<div class="kpi-grid">
+<div class="kpi-card"><span class="kpi-label">Temperatura</span><span class="kpi-value" id="weatherTemp">—</span></div>
+<div class="kpi-card"><span class="kpi-label">Nubosidad</span><span class="kpi-value" id="weatherCloud">—</span></div>
+<div class="kpi-card"><span class="kpi-label">Viento</span><span class="kpi-value" id="weatherWind">—</span></div>
+<div class="kpi-card kpi-danger"><span class="kpi-label">Índice Observación</span><span class="kpi-value" id="obsScore">—</span></div>
+</div>
+<div id="alertPanel" class="insights-panel"></div>
+</section>
+
+</main>
+
+  <footer class="site-footer">
+    <p>Fuente: <a href="https://api.nasa.gov/" target="_blank" rel="noopener">NASA NeoWs API</a> — Proyecto universitario Big Data & Business Intelligence</p>
+    <p>Integrantes: Bastian Alfaro · Brian Gomez</p>
+  </footer>
+
+  <script src="dataProcessor.js"></script>
+  <script src="charts.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
