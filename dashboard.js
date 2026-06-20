@@ -13,7 +13,7 @@
 
 // Local storage helper
 
-const API_BASE = "http://localhost:5000";
+const API_BASE = window.location.origin;
 const LocalStore = {
   save(data){ localStorage.setItem('neo_dashboard_data', JSON.stringify(data)); },
   load(){ try { return JSON.parse(localStorage.getItem('neo_dashboard_data') || 'null'); } catch(e){ return null; } },
@@ -216,16 +216,26 @@ async function refreshData(){
       `Actualizando NASA (${start} → ${end})...`
     );
 
-    await fetch(
+    const response = await fetch(
       `${API_BASE}/api/update?start=${start}&end=${end}`,
       {
         method:"POST"
       }
     );
 
+    const result =
+      await response.json();
+
+    console.log(
+      "UPDATE:",
+      result
+    );
+
     LocalStore.clear();
 
     await loadData(true);
+
+    await loadStorageInfo();
 
     _showStatus(
       "Actualización completada"
@@ -432,8 +442,9 @@ document.addEventListener('DOMContentLoaded',updateSnapshotCounter);
 
 async function loadStorageInfo() {
   try {
+
     const response = await fetch(
-      "http://localhost:5000/api/storage"
+      `${API_BASE}/api/storage`
     );
 
     const data = await response.json();
@@ -443,15 +454,30 @@ async function loadStorageInfo() {
     const cols = document.getElementById('collectionsCount');
     const sync = document.getElementById('lastSyncValue');
 
-    if (snap) snap.textContent = data.snapshots;
-    if (docs) docs.textContent = data.asteroids + data.weather;
-    if (cols) cols.textContent = data.collections;
-    if (sync) sync.textContent = data.last_sync;
+    if (snap) snap.textContent = data.snapshots || 0;
+
+    if (docs)
+      docs.textContent =
+        (data.asteroids || 0) +
+        (data.weather || 0);
+
+    if (cols)
+      cols.textContent =
+        data.collections || 0;
+
+    if (sync)
+      sync.textContent =
+        data.last_sync || "--";
 
     console.log("Storage:", data);
 
   } catch (err) {
-    console.error("Storage error:", err);
+
+    console.error(
+      "Storage error:",
+      err
+    );
+
   }
 }
 document.addEventListener('DOMContentLoaded', () => {
