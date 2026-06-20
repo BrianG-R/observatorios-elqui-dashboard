@@ -1,5 +1,5 @@
 
 const APP_CONFIG = {
-  DEV_MODE: true,
+  DEV_MODE: false,
   SNAPSHOT_FILE: './data/snapshot.json'
 };

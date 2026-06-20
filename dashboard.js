@@ -11,6 +11,15 @@
  * - Gestionar estado de la UI (loading, error, empty)
  */
 
+// Local storage helper
+
+const API_BASE = "http://localhost:5000";
+const LocalStore = {
+  save(data){ localStorage.setItem('neo_dashboard_data', JSON.stringify(data)); },
+  load(){ try { return JSON.parse(localStorage.getItem('neo_dashboard_data') || 'null'); } catch(e){ return null; } },
+  clear(){ localStorage.removeItem('neo_dashboard_data'); }
+};
+
 /* Estado global del dashboard */
 let _allRecords  = [];
 let _filteredRecs = [];
@@ -52,11 +61,17 @@ async function loadData() {
   }
 
   _setLoading(true);
-  _showStatus(`Consultando NASA NeoWs API (${start} → ${end})...`);
+  _showStatus(`Consultando datos desde MongoDB...`);
 
   try {
-    const raw      = await NASA_API.fetchRange(start, end);
+    const response = await fetch(
+    `${API_BASE}/api/asteroids?start=${start}&end=${end}`
+    );
+
+    const raw = await response.json();
+    console.log("RAW API:", raw);
     _allRecords    = DataProcessor.clean(raw);
+    console.log("LIMPIOS:", _allRecords);
 
     if (!_allRecords.length) {
       _showStatus('La API no devolvió registros para el rango seleccionado.', true);
@@ -77,7 +92,7 @@ async function loadData() {
 
   } catch (err) {
     console.error('[Dashboard]', err);
-    _showStatus(`Error al conectar con NASA API: ${err.message}`, true);
+    _showStatus(`Error al conectar con el backend: ${err.message}`, true);
   } finally {
     _setLoading(false);
   }
@@ -188,8 +203,43 @@ function _fmtDate(d) {
 
 
 async function refreshData(){
-  LocalStore.clear();
-  return await loadData(true);
+
+  try{
+
+    const start =
+      document.getElementById("dateStart").value;
+
+    const end =
+      document.getElementById("dateEnd").value;
+
+    _showStatus(
+      `Actualizando NASA (${start} → ${end})...`
+    );
+
+    await fetch(
+      `${API_BASE}/api/update?start=${start}&end=${end}`,
+      {
+        method:"POST"
+      }
+    );
+
+    LocalStore.clear();
+
+    await loadData(true);
+
+    _showStatus(
+      "Actualización completada"
+    );
+
+  }catch(err){
+
+    console.error(err);
+
+    _showStatus(
+      "Error actualizando NASA",
+      true
+    );
+  }
 }
 
 const _loadDataOriginal = loadData;
@@ -216,7 +266,12 @@ loadData = async function(forceRefresh=false){
 
   if(_allRecords.length){
     try{
-      const weather = await WeatherAPI.fetchWeather();
+      const weatherResponse = await fetch(`${API_BASE}/api/weather`);
+      const weather = await weatherResponse.json();
+
+      console.log("WEATHER:", weather);
+
+      renderWeatherDashboard(weather);
       LocalStore.save({
         lastUpdate:new Date().toISOString(),
         weather,
@@ -226,7 +281,7 @@ loadData = async function(forceRefresh=false){
       console.warn('No se pudo obtener clima',e);
     }
   }
-};
+}
 
 document.addEventListener('DOMContentLoaded', ()=>{
   console.log('Dashboard ETL listo');
@@ -234,13 +289,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 
 function renderWeatherInfo(weather){
- if(!weather || !weather.current) return;
+ if(!weather) return;
 
- const temp=weather.current.temperature_2m ?? 0;
- const cloud=weather.current.cloud_cover ?? 0;
- const wind=weather.current.wind_speed_10m ?? 0;
+ const temp = weather.temperatura ?? 0;
+ const cloud = weather.nubosidad ?? 0;
+ const wind = weather.viento ?? 0;
 
- const score=Math.max(0,Math.round(100-(cloud*0.5)-(wind*1.5)));
+ const score = Math.max(
+   0,
+   Math.round(100 - (cloud * 0.5) - (wind * 1.5))
+ );
 
  const t=document.getElementById('tempValue');
  const c=document.getElementById('cloudValue');
@@ -251,15 +309,6 @@ function renderWeatherInfo(weather){
  if(c) c.textContent=cloud;
  if(w) w.textContent=wind;
  if(o) o.textContent=score;
-
- const alert=document.getElementById('alertPanel');
- if(alert){
-   let msg=[];
-   if(score<50) msg.push('⚠ Condiciones de observación deficientes');
-   if(cloud>70) msg.push('⚠ Alta nubosidad');
-   if(wind>30) msg.push('⚠ Viento elevado');
-   alert.innerHTML=msg.join('<br>');
- }
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -297,38 +346,32 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
 
 function renderWeatherDashboard(weather){
- if(!weather||!weather.current)return;
- const t=weather.current.temperature_2m??0;
- const c=weather.current.cloud_cover??0;
- const w=weather.current.wind_speed_10m??0;
- const score=Math.max(0,Math.round(100-(c*0.5)-(w*1.5)));
- const set=(id,val)=>{const e=document.getElementById(id); if(e)e.textContent=val;}
- set('weatherTemp', t+' °C');
- set('weatherCloud', c+' %');
- set('weatherWind', w+' km/h');
- set('obsScore', score+'/100');
- const panel=document.getElementById('alertPanel');
- if(panel){
-   const alerts=[];
-   if(score>80) alerts.push('✅ Excelentes condiciones de observación');
-   if(c>70) alerts.push('⚠ Alta nubosidad');
-   if(w>30) alerts.push('⚠ Viento fuerte');
-   if((_kpis?.peligrosos||0)>10) alerts.push('☄ Múltiples objetos potencialmente peligrosos detectados');
-   panel.innerHTML=alerts.join('<br>');
- }
+
+  if(!weather) return;
+
+  const temp = weather.temperatura ?? 0;
+  const cloud = weather.nubosidad ?? 0;
+  const wind = weather.viento ?? 0;
+
+  const score = Math.max(
+    0,
+    Math.round(100 - (cloud * 0.5) - (wind * 1.5))
+  );
+
+  const set = (id,val)=>{
+    const e=document.getElementById(id);
+    if(e) e.textContent = val;
+  };
+
+  set('weatherTemp', temp + ' °C');
+  set('weatherCloud', cloud + ' %');
+  set('weatherWind', wind + ' km/h');
+  set('obsScore', score + '/100');
+
+  console.log('CLIMA CARGADO:', weather);
 }
 
-const _origLoadData2=loadData;
-loadData=async function(){
- await _origLoadData2();
- try{
-   const weather=await WeatherAPI.fetchWeather();
-   renderWeatherDashboard(weather);
-   const cache=JSON.parse(localStorage.getItem('neo_dashboard_data')||'{}');
-   cache.weather=weather;
-   localStorage.setItem('neo_dashboard_data',JSON.stringify(cache));
- }catch(e){console.warn(e);}
-}
+
 document.addEventListener('DOMContentLoaded',()=>{
  try{
   const cache=JSON.parse(localStorage.getItem('neo_dashboard_data')||'{}');
@@ -348,9 +391,13 @@ function updateDashboardStatus(){
 
     const alerts=[];
 
-    if(cache.weather && cache.weather.current){
-      const cloud = cache.weather.current.cloud_cover || 0;
-      const wind = cache.weather.current.wind_speed_10m || 0;
+    if(cache.weather){
+
+      const cloud =
+          cache.weather.nubosidad || 0;
+
+      const wind =
+          cache.weather.viento || 0;
 
       if(cloud > 70) alerts.push('⚠ Alta nubosidad');
       if(wind > 30) alerts.push('⚠ Viento elevado');
@@ -382,3 +429,31 @@ function updateSnapshotCounter(){
  if(el) el.textContent=c;
 }
 document.addEventListener('DOMContentLoaded',updateSnapshotCounter);
+
+async function loadStorageInfo() {
+  try {
+    const response = await fetch(
+      "http://localhost:5000/api/storage"
+    );
+
+    const data = await response.json();
+
+    const snap = document.getElementById('snapshotCount');
+    const docs = document.getElementById('mongoDocsCount');
+    const cols = document.getElementById('collectionsCount');
+    const sync = document.getElementById('lastSyncValue');
+
+    if (snap) snap.textContent = data.snapshots;
+    if (docs) docs.textContent = data.asteroids + data.weather;
+    if (cols) cols.textContent = data.collections;
+    if (sync) sync.textContent = data.last_sync;
+
+    console.log("Storage:", data);
+
+  } catch (err) {
+    console.error("Storage error:", err);
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  loadStorageInfo();
+});

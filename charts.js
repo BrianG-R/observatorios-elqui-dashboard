@@ -499,3 +499,71 @@ const Charts = (() => {
     }
   };
 })();
+
+async function renderWeatherCharts(){
+
+ const response =
+   await fetch(
+     "/api/weather-history"
+   );
+
+ const data =
+   await response.json();
+
+ const labels =
+   data.map(x => x.fecha);
+
+ new Chart(
+   document.getElementById(
+     "chartTemp"
+   ),
+   {
+     type:"line",
+     data:{
+       labels,
+       datasets:[{
+         label:"Temperatura",
+         data:data.map(
+           x => x.temperatura
+         )
+       }]
+     }
+   }
+ );
+
+ new Chart(
+   document.getElementById(
+     "chartCloud"
+   ),
+   {
+     type:"bar",
+     data:{
+       labels,
+       datasets:[{
+         label:"Nubosidad",
+         data:data.map(
+           x => x.nubosidad
+         )
+       }]
+     }
+   }
+ );
+
+ new Chart(
+   document.getElementById(
+     "chartWind"
+   ),
+   {
+     type:"line",
+     data:{
+       labels,
+       datasets:[{
+         label:"Viento",
+         data:data.map(
+           x => x.viento
+         )
+       }]
+     }
+   }
+ );
+}

@@ -1,14 +1,19 @@
+
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from pymongo import MongoClient
 import requests
 import pandas as pd
 import os
-from datetime import datetime
+import sys
 
 load_dotenv()
 
 NASA_KEY = os.getenv("NASA_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
+
+print("NASA_KEY =", NASA_KEY)
+print("MONGO_URI cargada =", "SI" if MONGO_URI else "NO")
 
 client = MongoClient(MONGO_URI)
 db = client["observatorios_elqui"]
@@ -17,52 +22,145 @@ db = client["observatorios_elqui"]
 # CONFIGURACION
 # ---------------------------------
 
-START_DATE = "2026-06-01"
-END_DATE = "2026-06-07"
+if len(sys.argv) >= 3:
 
-# Cerro Tololo (cerca de La Serena)
+    START_DATE = sys.argv[1]
+    END_DATE = sys.argv[2]
+
+else:
+
+    START_DATE = (
+        datetime.now() - timedelta(days=7)
+    ).strftime("%Y-%m-%d")
+
+    END_DATE = datetime.now().strftime("%Y-%m-%d")
+
+print("START_DATE =", START_DATE)
+print("END_DATE =", END_DATE)
+
 LAT = -30.169
 LON = -70.806
 
 # ---------------------------------
-# NASA NEO
+# NASA NEO (CONSULTA POR BLOQUES)
 # ---------------------------------
-
-nasa_url = (
-    f"https://api.nasa.gov/neo/rest/v1/feed"
-    f"?start_date={START_DATE}"
-    f"&end_date={END_DATE}"
-    f"&api_key={NASA_KEY}"
-)
-
-print("Consultando NASA...")
-
-nasa_data = requests.get(nasa_url).json()
 
 records = []
 
-for fecha, asteroides in nasa_data["near_earth_objects"].items():
+fecha_inicio = datetime.strptime(
+    START_DATE,
+    "%Y-%m-%d"
+)
 
-    for neo in asteroides:
+fecha_fin = datetime.strptime(
+    END_DATE,
+    "%Y-%m-%d"
+)
 
-        acercamiento = neo["close_approach_data"][0]
+while fecha_inicio <= fecha_fin:
 
-        records.append({
-            "fecha": fecha,
-            "nombre": neo["name"],
-            "diametro_km": neo["estimated_diameter"]["kilometers"]["estimated_diameter_max"],
-            "peligroso": neo["is_potentially_hazardous_asteroid"],
-            "velocidad_kmh": float(
-                acercamiento["relative_velocity"]["kilometers_per_hour"]
-            ),
-            "distancia_km": float(
-                acercamiento["miss_distance"]["kilometers"]
+    bloque_fin = min(
+        fecha_inicio + timedelta(days=7),
+        fecha_fin
+    )
+
+    nasa_url = (
+        "https://api.nasa.gov/neo/rest/v1/feed"
+        f"?start_date={fecha_inicio.strftime('%Y-%m-%d')}"
+        f"&end_date={bloque_fin.strftime('%Y-%m-%d')}"
+        f"&api_key={NASA_KEY}"
+    )
+
+    print("Consultando:", nasa_url)
+
+    try:
+
+        response = requests.get(
+            nasa_url,
+            timeout=30
+        )
+
+        print(
+            "Status NASA:",
+            response.status_code
+        )
+
+        nasa_data = response.json()
+
+        if "near_earth_objects" not in nasa_data:
+            print(
+                "NASA no devolvió datos para este bloque"
             )
-        })
+            fecha_inicio = (
+                bloque_fin + timedelta(days=1)
+            )
+            continue
+
+        for fecha, asteroides in nasa_data[
+            "near_earth_objects"
+        ].items():
+
+            for neo in asteroides:
+
+                if not neo.get(
+                    "close_approach_data"
+                ):
+                    continue
+
+                acercamiento = neo[
+                    "close_approach_data"
+                ][0]
+
+                records.append({
+
+                    "fecha": fecha,
+
+                    "nombre": neo["name"],
+
+                    "diametro_km":
+                        neo["estimated_diameter"]
+                        ["kilometers"]
+                        ["estimated_diameter_max"],
+
+                    "peligroso":
+                        neo[
+                            "is_potentially_hazardous_asteroid"
+                        ],
+
+                    "velocidad_kmh": float(
+                        acercamiento[
+                            "relative_velocity"
+                        ][
+                            "kilometers_per_hour"
+                        ]
+                    ),
+
+                    "distancia_km": float(
+                        acercamiento[
+                            "miss_distance"
+                        ][
+                            "kilometers"
+                        ]
+                    )
+                })
+
+    except Exception as e:
+
+        print(
+            "ERROR EN BLOQUE NASA:",
+            e
+        )
+
+    fecha_inicio = (
+        bloque_fin + timedelta(days=1)
+    )
+
+print(
+    "Asteroides encontrados:",
+    len(records)
+)
 
 df = pd.DataFrame(records)
-
-print(f"Asteroides encontrados: {len(df)}")
 
 # ---------------------------------
 # OPEN METEO
@@ -77,7 +175,17 @@ weather_url = (
 
 print("Consultando Open-Meteo...")
 
-weather_data = requests.get(weather_url).json()
+response_weather = requests.get(
+    weather_url,
+    timeout=30
+)
+
+print(
+    "Status Open-Meteo:",
+    response_weather.status_code
+)
+
+weather_data = response_weather.json()
 
 weather_doc = {
     "fecha": datetime.now().strftime("%Y-%m-%d"),
@@ -93,11 +201,23 @@ weather_doc = {
 
 total = len(df)
 
-peligrosos = int(df["peligroso"].sum())
+peligrosos = int(
+    df["peligroso"].sum()
+) if not df.empty else 0
 
-velocidad_promedio = round(df["velocidad_kmh"].mean(), 2)
+velocidad_promedio = float(
+    round(
+        df["velocidad_kmh"].mean(),
+        2
+    )
+) if not df.empty else 0
 
-distancia_promedio = round(df["distancia_km"].mean(), 2)
+distancia_promedio = float(
+    round(
+        df["distancia_km"].mean(),
+        2
+    )
+) if not df.empty else 0
 
 indice_observacion = max(
     0,
@@ -115,7 +235,10 @@ snapshot = {
     "temperatura": weather_doc["temperatura"],
     "nubosidad": weather_doc["nubosidad"],
     "viento": weather_doc["viento"],
-    "indice_observacion": round(indice_observacion, 2)
+    "indice_observacion": round(
+        indice_observacion,
+        2
+    )
 }
 
 # ---------------------------------
@@ -124,16 +247,41 @@ snapshot = {
 
 print("Guardando asteroides...")
 
-if len(records) > 0:
-    db.neo_asteroids.insert_many(records)
+insertados = 0
+
+for rec in records:
+
+    existe = db.neo_asteroids.find_one({
+
+        "fecha": rec["fecha"],
+        "nombre": rec["nombre"]
+
+    })
+
+    if not existe:
+
+        db.neo_asteroids.insert_one(rec)
+        insertados += 1
+
+print(
+    f"Asteroides nuevos insertados: {insertados}"
+)
 
 print("Guardando clima...")
 
-db.weather_conditions.insert_one(weather_doc)
+db.weather_conditions.delete_many({})
+
+db.weather_conditions.insert_one(
+    weather_doc
+)
 
 print("Guardando snapshot...")
 
-db.etl_snapshots.insert_one(snapshot)
+db.etl_snapshots.insert_one(
+    snapshot
+)
 
 print("ETL COMPLETADO")
+
 print(snapshot)
+

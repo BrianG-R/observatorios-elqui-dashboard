@@ -21,46 +21,61 @@ const DataProcessor = {
    * @param {Object[]} rawNeos - Array crudo de la API
    * @returns {Object[]} - Array de registros normalizados
    */
-  clean(rawNeos) {
-    const cleaned = [];
+clean(rawNeos) {
+  const cleaned = [];
 
-    for (const neo of rawNeos) {
-      try {
-        const approachData = neo.close_approach_data?.[0];
-        if (!approachData) continue;
+  for (const neo of rawNeos) {
 
-        const diamMin = neo.estimated_diameter?.kilometers?.estimated_diameter_min;
-        const diamMax = neo.estimated_diameter?.kilometers?.estimated_diameter_max;
-        const vel     = parseFloat(approachData.relative_velocity?.kilometers_per_hour);
-        const dist    = parseFloat(approachData.miss_distance?.kilometers);
+  try {
 
-        /* Filtrar registros con datos numéricos inválidos */
-        if (!isFinite(vel) || !isFinite(dist) || vel <= 0 || dist <= 0) continue;
-        if (!isFinite(diamMin) || !isFinite(diamMax)) continue;
+    cleaned.push({
+      id: neo._id || Math.random().toString(36).substring(2,8),
 
-        cleaned.push({
-          id:           neo.id,
-          nombre:       neo.name,
-          fecha:        neo._fecha || approachData.close_approach_date,
-          velocidad:    Math.round(vel),
-          distancia:    Math.round(dist),
-          diametroMin:  parseFloat(diamMin.toFixed(4)),
-          diametroMax:  parseFloat(diamMax.toFixed(4)),
-          diametroMed:  parseFloat(((diamMin + diamMax) / 2).toFixed(4)),
-          peligroso:    neo.is_potentially_hazardous_asteroid === true,
-          magnitud:     neo.absolute_magnitude_h ?? null,
-          orbitaId:     neo.orbital_data?.orbit_id ?? null,
-          urlNASA:      neo.nasa_jpl_url ?? null
-        });
-      } catch (_) {
-        /* Registro malformado → se descarta silenciosamente */
-      }
-    }
+      nombre: neo.nombre || 'Sin nombre',
 
-    /* Ordenar por fecha ascendente */
-    cleaned.sort((a, b) => a.fecha.localeCompare(b.fecha));
-    return cleaned;
-  },
+      fecha: neo.fecha,
+
+      velocidad: Math.round(
+        Number(neo.velocidad_kmh || 0)
+      ),
+
+      distancia: Math.round(
+        Number(neo.distancia_km || 0)
+      ),
+
+      diametroMin: Number(
+        neo.diametro_km || 0
+      ),
+
+      diametroMax: Number(
+        neo.diametro_km || 0
+      ),
+
+      diametroMed: Number(
+        neo.diametro_km || 0
+      ),
+
+      peligroso: Boolean(
+        neo.peligroso
+      ),
+
+      magnitud: null,
+      orbitaId: null,
+      urlNASA: null
+    });
+
+  } catch(e) {
+    console.warn(e);
+  }
+
+  }
+
+  cleaned.sort(
+  (a,b)=>a.fecha.localeCompare(b.fecha)
+  );
+
+  return cleaned;
+},
 
   /**
    * CÁLCULO DE KPIs EJECUTIVOS
